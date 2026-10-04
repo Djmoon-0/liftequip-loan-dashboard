@@ -1,4 +1,4 @@
-import json, os, urllib.request, tempfile
+import json, os, urllib.request, http.cookiejar, tempfile
 from datetime import datetime, date
 from collections import Counter, defaultdict
 from openpyxl import load_workbook
@@ -30,7 +30,16 @@ if LOCAL:
     path = LOCAL
 else:
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        urllib.request.urlretrieve(URL, tmp.name); path=tmp.name
+        # OneDrive share links need a browser-like redeem flow with cookies
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        opener.addheaders = [("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36")]
+        with opener.open(URL, timeout=120) as resp, open(tmp.name, "wb") as out:
+            while True:
+                chunk = resp.read(1 << 20)
+                if not chunk: break
+                out.write(chunk)
+        path = tmp.name
 wb=load_workbook(path, read_only=True, data_only=True); records=[]; seen=set()
 for sheet in ("Daily Issue LE Item", "Old Record"):
     if sheet not in wb.sheetnames: continue
